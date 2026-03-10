@@ -101,6 +101,26 @@ st.markdown("""
     .login-button:hover {
         background-color: rgba(255, 255, 255, 0.3);
     }
+    @keyframes blood-drop {
+        0% {
+            transform: translateY(-100vh) scale(0);
+            opacity: 1;
+        }
+        50% {
+            opacity: 1;
+        }
+        100% {
+            transform: translateY(100vh) scale(1);
+            opacity: 0;
+        }
+    }
+    .blood-splash {
+        position: fixed;
+        font-size: 40px;
+        animation: blood-drop 3s ease-in;
+        pointer-events: none;
+        z-index: 9999;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -136,7 +156,26 @@ with col2:
     email = st.text_input("Email Address", placeholder="Enter your email address")
     
     if st.button("Register as Donor"):
-        st.success("Registration form submitted successfully!")
-        st.balloons()
+        st.success("✅ Registration successful! Thank you for saving lives! 🩸")
+        st.markdown("""
+            <script>
+            function createBloodDrops() {
+                const drops = ['🩸', '💉', '❤️', '🩸', '💧'];
+                for(let i = 0; i < 30; i++) {
+                    setTimeout(() => {
+                        const drop = document.createElement('div');
+                        drop.className = 'blood-splash';
+                        drop.innerHTML = drops[Math.floor(Math.random() * drops.length)];
+                        drop.style.left = Math.random() * 100 + 'vw';
+                        drop.style.animationDelay = Math.random() * 0.5 + 's';
+                        document.body.appendChild(drop);
+                        setTimeout(() => drop.remove(), 3000);
+                    }, i * 100);
+                }
+            }
+            createBloodDrops();
+            </script>
+            """, unsafe_allow_html=True)
+        st.snow()
 
 st.markdown("<br><br>", unsafe_allow_html=True)
