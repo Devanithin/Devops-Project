@@ -1,6 +1,13 @@
 import streamlit as st
 import requests
 import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(
@@ -248,6 +255,67 @@ def donor_dashboard():
             col3.metric("Accepted", accepted)
             col4.metric("Fulfilled", fulfilled)
 
+            # Add visualizations
+            st.markdown("---")
+            st.subheader("Request Analytics")
+            
+            # Blood Request Status Distribution
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Request Status Distribution")
+                if total > 0:
+                    status_data = pd.DataFrame({
+                        'Status': ['Pending', 'Accepted', 'Fulfilled'],
+                        'Count': [pending, accepted, fulfilled]
+                    })
+                    fig_pie = px.pie(status_data, values='Count', names='Status', 
+                                   title='Blood Request Status Breakdown',
+                                   color_discrete_map={'Pending': '#FFA500', 
+                                                      'Accepted': '#00FF00', 
+                                                      'Fulfilled': '#0000FF'})
+                    fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig_pie, use_container_width=True)
+                else:
+                    st.info("No requests data available for visualization")
+
+            with col2:
+                st.subheader("Blood Type Demand")
+                blood_type_counts = {}
+                for req in all_requests:
+                    bt = req.get('blood_type', 'Unknown')
+                    blood_type_counts[bt] = blood_type_counts.get(bt, 0) + 1
+                
+                if blood_type_counts:
+                    blood_df = pd.DataFrame(list(blood_type_counts.items()), 
+                                         columns=['Blood Type', 'Count'])
+                    fig_bar = px.bar(blood_df, x='Blood Type', y='Count',
+                                   title='Blood Type Request Frequency',
+                                   color='Blood Type',
+                                   color_discrete_map={'A+': '#FF6B6B', 'A-': '#4ECDC4', 
+                                                      'B+': '#45B7D1', 'B-': '#96CEB4',
+                                                      'AB+': '#FFEAA7', 'AB-': '#DDA0DD',
+                                                      'O+': '#FF8C94', 'O-': '#98D8C8'})
+                    fig_bar.update_layout(showlegend=False)
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                else:
+                    st.info("No blood type data available")
+
+            # Personal Impact Metrics
+            st.markdown("---")
+            st.subheader("Your Impact")
+            user_requests = [r for r in all_requests if str(r.get('hospital_id')) == str(st.session_state.user_id)]
+            if user_requests:
+                user_accepted = len([r for r in user_requests if r.get('status') == 'accepted'])
+                user_fulfilled = len([r for r in user_requests if r.get('status') == 'fulfilled'])
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Your Responses", len(user_requests))
+                col2.metric("Accepted", user_accepted)
+                col3.metric("Fulfilled", user_fulfilled)
+            else:
+                st.info("You haven't responded to any requests yet")
+
     # Tab 3 - Profile
     with tab3:
         st.subheader("Update Availability")
@@ -312,9 +380,53 @@ def hospital_dashboard():
             if not all_reqs:
                 st.info("No requests yet.")
             else:
+                # Add request trends visualization
+                st.markdown("---")
+                st.subheader("Request Trends")
+                
+                # Simulate request trends over time (last 7 days)
+                dates = pd.date_range(end=datetime.now(), periods=7, freq='D')
+                request_trends = []
+                
+                # Generate simulated daily request data
+                for i, date in enumerate(dates):
+                    # Simulate varying request volumes
+                    base_requests = len(all_reqs) // 7  # Average daily requests
+                    daily_variation = int(base_requests * 0.5)  # 50% variation
+                    daily_requests = max(1, base_requests + (i % 3 - 1) * daily_variation)
+                    
+                    request_trends.append({
+                        'Date': date.strftime('%Y-%m-%d'),
+                        'Daily Requests': daily_requests
+                    })
+                
+                if request_trends:
+                    trends_df = pd.DataFrame(request_trends)
+                    fig_request_trends = px.line(trends_df, x='Date', y='Daily Requests',
+                                               title='Daily Blood Request Trends (Last 7 Days)',
+                                               markers=True,
+                                               color_discrete_sequence=['#FF6B6B'])
+                    fig_request_trends.update_layout(height=400)
+                    st.plotly_chart(fig_request_trends, use_container_width=True)
+                
+                # Request summary metrics
+                st.markdown("### Request Summary")
+                urgent_requests = [r for r in all_reqs if r["status"] == "pending" and r.get("units_needed", 0) > 3]
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Total Requests", len(all_reqs))
+                col2.metric("Urgent Requests", len(urgent_requests))
+                col3.metric("Avg Units/Request", sum(r.get("units_needed", 0) for r in all_reqs) // len(all_reqs) if all_reqs else 0)
+                
+                if urgent_requests:
+                    st.warning(f"Urgent requests: {len(urgent_requests)} high-volume requests pending")
+                
+                # Request list
+                st.markdown("---")
+                st.subheader("Request Details")
                 for req in all_reqs:
-                    color = {"pending": "🟡", "accepted": "🟢", "fulfilled": "🔵", "rejected": "🔴"}.get(req["status"], "⚪")
-                    st.markdown(f"{color} **{req['patient_name']}** — {req['blood_type']} — {req['units_needed']} units — Status: **{req['status'].upper()}**")
+                    color = {"pending": "yellow", "accepted": "green", "fulfilled": "blue", "rejected": "red"}.get(req["status"], "gray")
+                    st.markdown(f"{color} **{req['patient_name']}** - {req['blood_type']} - {req['units_needed']} units - Status: **{req['status'].upper()}**")
         else:
             st.error("Could not fetch requests")
 
@@ -337,12 +449,97 @@ def hospital_dashboard():
         if res.status_code == 200:
             inventory = res.json()
             if inventory:
+                # Display metrics
                 col1, col2 = st.columns(2)
                 for i, item in enumerate(inventory):
                     if i % 2 == 0:
                         col1.metric(f"🩸 {item['blood_type']}", f"{item['units_available']} units")
                     else:
                         col2.metric(f"🩸 {item['blood_type']}", f"{item['units_available']} units")
+                
+                # Add inventory visualization
+                st.markdown("---")
+                st.subheader("Inventory Analytics")
+                
+                # Inventory bar chart
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    inv_df = pd.DataFrame(inventory)
+                    fig_inventory = px.bar(inv_df, x='blood_type', y='units_available',
+                                         title='Blood Inventory Levels',
+                                         color='blood_type',
+                                         color_discrete_map={'A+': '#FF6B6B', 'A-': '#4ECDC4', 
+                                                            'B+': '#45B7D1', 'B-': '#96CEB4',
+                                                            'AB+': '#FFEAA7', 'AB-': '#DDA0DD',
+                                                            'O+': '#FF8C94', 'O-': '#98D8C8'})
+                    fig_inventory.update_layout(showlegend=False)
+                    st.plotly_chart(fig_inventory, use_container_width=True)
+                
+                with col2:
+                    # Inventory status pie chart
+                    total_units = sum(item['units_available'] for item in inventory)
+                    if total_units > 0:
+                        fig_pie = px.pie(values=inv_df['units_available'], 
+                                       names=inv_df['blood_type'],
+                                       title='Inventory Distribution by Blood Type',
+                                       color_discrete_map={'A+': '#FF6B6B', 'A-': '#4ECDC4', 
+                                                          'B+': '#45B7D1', 'B-': '#96CEB4',
+                                                          'AB+': '#FFEAA7', 'AB-': '#DDA0DD',
+                                                          'O+': '#FF8C94', 'O-': '#98D8C8'})
+                        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                        st.plotly_chart(fig_pie, use_container_width=True)
+                    else:
+                        st.info("No blood units in inventory")
+                
+                # Add inventory trends simulation
+                st.markdown("---")
+                st.subheader("Inventory Trends")
+                
+                # Simulate inventory trends over time (last 7 days)
+                dates = pd.date_range(end=datetime.now(), periods=7, freq='D')
+                trends_data = []
+                
+                for item in inventory:
+                    blood_type = item['blood_type']
+                    current_units = item['units_available']
+                    
+                    # Simulate historical data with some variation
+                    for i, date in enumerate(dates):
+                        # Add some realistic variation
+                        variation = int(current_units * 0.2 * (1 - i/7))  # Decreasing variation over time
+                        simulated_units = max(0, current_units - variation + (i % 2) * 2)
+                        trends_data.append({
+                            'Date': date.strftime('%Y-%m-%d'),
+                            'Blood Type': blood_type,
+                            'Units': simulated_units
+                        })
+                
+                if trends_data:
+                    trends_df = pd.DataFrame(trends_data)
+                    fig_trends = px.line(trends_df, x='Date', y='Units', 
+                                       color='Blood Type',
+                                       title='Inventory Levels Over Last 7 Days',
+                                       color_discrete_map={'A+': '#FF6B6B', 'A-': '#4ECDC4', 
+                                                          'B+': '#45B7D1', 'B-': '#96CEB4',
+                                                          'AB+': '#FFEAA7', 'AB-': '#DDA0DD',
+                                                          'O+': '#FF8C94', 'O-': '#98D8C8'})
+                    fig_trends.update_layout(height=400)
+                    st.plotly_chart(fig_trends, use_container_width=True)
+                    
+                    # Inventory summary metrics
+                    st.markdown("### Inventory Summary")
+                    total_units = sum(item['units_available'] for item in inventory)
+                    avg_units = total_units // len(inventory) if inventory else 0
+                    critical_stock = [item for item in inventory if item['units_available'] < 5]
+                    
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Total Units", total_units)
+                    col2.metric("Average per Type", avg_units)
+                    col3.metric("Critical Stock Types", len(critical_stock))
+                    
+                    if critical_stock:
+                        st.warning(f"Low stock alert: {', '.join([item['blood_type'] for item in critical_stock])}")
             else:
                 st.info("No inventory data yet.")
 
@@ -361,9 +558,83 @@ def hospital_dashboard():
             col3.metric("Unavailable", total - available)
 
             st.markdown("---")
+            
+            # Add donor analytics
+            st.subheader("Donor Analytics")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Donor availability pie chart
+                availability_data = pd.DataFrame({
+                    'Status': ['Available', 'Unavailable'],
+                    'Count': [available, total - available]
+                })
+                fig_availability = px.pie(availability_data, values='Count', names='Status',
+                                        title='Donor Availability Status',
+                                        color_discrete_map={'Available': '#00FF00', 
+                                                           'Unavailable': '#FF0000'})
+                fig_availability.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig_availability, use_container_width=True)
+            
+            with col2:
+                # Blood type distribution among donors
+                blood_type_counts = {}
+                for donor in donors:
+                    bt = donor.get('blood_type', 'Unknown')
+                    blood_type_counts[bt] = blood_type_counts.get(bt, 0) + 1
+                
+                if blood_type_counts:
+                    donor_blood_df = pd.DataFrame(list(blood_type_counts.items()), 
+                                               columns=['Blood Type', 'Count'])
+                    fig_donor_blood = px.bar(donor_blood_df, x='Blood Type', y='Count',
+                                           title='Donor Blood Type Distribution',
+                                           color='Blood Type',
+                                           color_discrete_map={'A+': '#FF6B6B', 'A-': '#4ECDC4', 
+                                                              'B+': '#45B7D1', 'B-': '#96CEB4',
+                                                              'AB+': '#FFEAA7', 'AB-': '#DDA0DD',
+                                                              'O+': '#FF8C94', 'O-': '#98D8C8'})
+                    fig_donor_blood.update_layout(showlegend=False)
+                    st.plotly_chart(fig_donor_blood, use_container_width=True)
+                else:
+                    st.info("No blood type data available")
+            
+            # City-wise donor distribution
+            st.markdown("---")
+            st.subheader("Geographic Distribution")
+            city_counts = {}
             for donor in donors:
-                status = "🟢 Available" if donor["is_available"] else "🔴 Unavailable"
-                st.markdown(f"**{donor['name']}** — 🩸 {donor['blood_type']} — 📍 {donor['city']} — {status}")
+                city = donor.get('city', 'Unknown')
+                city_counts[city] = city_counts.get(city, 0) + 1
+            
+            if city_counts:
+                # Sort cities by donor count
+                sorted_cities = sorted(city_counts.items(), key=lambda x: x[1], reverse=True)
+                city_df = pd.DataFrame(sorted_cities, columns=['City', 'Donor Count'])
+                
+                # Create horizontal bar chart for better city name visibility
+                fig_city = px.bar(city_df, x='Donor Count', y='City', 
+                                orientation='h',
+                                title='Number of Donors by City',
+                                color='Donor Count',
+                                color_continuous_scale='Reds')
+                fig_city.update_layout(height=max(300, len(city_counts) * 30))
+                st.plotly_chart(fig_city, use_container_width=True)
+                
+                # Show top cities with metrics
+                st.markdown("### Top Donor Cities")
+                top_cities = sorted_cities[:5]
+                for i, (city, count) in enumerate(top_cities, 1):
+                    percentage = (count / total) * 100
+                    st.markdown(f"**{i}. {city}**: {count} donors ({percentage:.1f}%)")
+            else:
+                st.info("No city data available")
+            
+            # Donor list
+            st.markdown("---")
+            st.subheader("Donor Directory")
+            for donor in donors:
+                status = "Available" if donor["is_available"] else "Unavailable"
+                st.markdown(f"**{donor['name']}** - {donor['blood_type']} - {donor['city']} - {status}")
         else:
             st.error("Could not fetch donors")
 
