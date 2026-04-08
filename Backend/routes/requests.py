@@ -5,6 +5,7 @@ from models import BloodRequest, Donor, NotificationLog
 from pydantic import BaseModel
 from datetime import datetime
 from geopy.distance import geodesic
+from geopy.geocoders import Nominatim
 
 router = APIRouter()
 
@@ -13,12 +14,11 @@ class BloodRequestCreate(BaseModel):
     blood_type: str
     units_needed: int
     patient_name: str
-    accident_latitude: float
-    accident_longitude: float
+    accident_location: str
 
 class DonorResponse(BaseModel):
     donor_id: int
-    response: str  # "accepted" or "rejected"
+    response: str
 
 def get_prioritized_donors(accident_lat, accident_lon, blood_type, db):
     donors = db.query(Donor).filter(
@@ -41,14 +41,28 @@ def get_prioritized_donors(accident_lat, accident_lon, blood_type, db):
 
 @router.post("/create")
 def create_blood_request(request: BloodRequestCreate, db: Session = Depends(get_db)):
-    new_request = BloodRequest(**request.model_dump(), status="pending")
+    geolocator = Nominatim(user_agent="blood_donor_system")
+    location = geolocator.geocode(request.accident_location + ", India")
+
+    if not location:
+        raise HTTPException(status_code=400, detail="Could not find accident location.")
+
+    new_request = BloodRequest(
+        hospital_id=request.hospital_id,
+        blood_type=request.blood_type,
+        units_needed=request.units_needed,
+        patient_name=request.patient_name,
+        accident_latitude=location.latitude,
+        accident_longitude=location.longitude,
+        status="pending"
+    )
     db.add(new_request)
     db.commit()
     db.refresh(new_request)
 
     prioritized = get_prioritized_donors(
-        request.accident_latitude,
-        request.accident_longitude,
+        location.latitude,
+        location.longitude,
         request.blood_type,
         db
     )
@@ -72,6 +86,7 @@ def create_blood_request(request: BloodRequestCreate, db: Session = Depends(get_
     return {
         "message": "Blood request created",
         "request_id": new_request.id,
+        "accident_location": location.address,
         "donors_notified": notified
     }
 
