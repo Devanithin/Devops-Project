@@ -1,0 +1,21 @@
+
+services:
+  backend:
+    build: ./Backend
+    container_name: blood_donor_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./Backend/.env
+    restart: always
+
+  frontend:
+    build: ./frontend
+    container_name: blood_donor_frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: always

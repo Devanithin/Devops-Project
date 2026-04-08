@@ -4,3 +4,4 @@ __pycache__/
 *.pyo
 .dev_venv/
 dev_venv/
+seed.py 
