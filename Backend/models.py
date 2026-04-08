@@ -1,24 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
 import enum
-
-class BloodType(str, enum.Enum):
-    A_POS = "A+"
-    A_NEG = "A-"
-    B_POS = "B+"
-    B_NEG = "B-"
-    AB_POS = "AB+"
-    AB_NEG = "AB-"
-    O_POS = "O+"
-    O_NEG = "O-"
-
-class RequestStatus(str, enum.Enum):
-    PENDING = "pending"
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
-    FULFILLED = "fulfilled"
 
 class Donor(Base):
     __tablename__ = "donors"
@@ -27,6 +11,7 @@ class Donor(Base):
     name = Column(String, nullable=False)
     phone = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
     blood_type = Column(String, nullable=False)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
@@ -44,7 +29,9 @@ class Hospital(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     city = Column(String, nullable=False)
-    phone = Column(String, nullable=False)
+    phone = Column(String, unique=True, nullable=False)
+    email = Column(String, unique=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
