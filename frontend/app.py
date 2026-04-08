@@ -8,7 +8,7 @@ st.set_page_config(
     page_icon="🩸",
     layout="wide"
 )
-
+ 
 # Session state init
 if "token" not in st.session_state:
     st.session_state.token = None

@@ -23,4 +23,4 @@ app.include_router(requests.router, prefix="/requests", tags=["Blood Requests"])
 
 @app.get("/")
 def root():
-    return {"message": "Blood Donor System API is running"}
+    return {"message": "Blood Donor System API is running"} 
