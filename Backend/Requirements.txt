@@ -7,3 +7,5 @@ geopy
 twilio
 pydantic[email]
 alembic
+python-jose[cryptography]
+passlib[bcrypt]
