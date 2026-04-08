@@ -9,3 +9,5 @@ pydantic[email]
 alembic
 python-jose[cryptography]
 passlib[bcrypt]
+streamlit
+requests
