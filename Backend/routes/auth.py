@@ -61,7 +61,7 @@ def register_donor(donor: DonorRegister, db: Session = Depends(get_db)):
         "donor_id": new_donor.id,
         "location_detected": location.address
     }
-
+#geognaeerioh
 @router.post("/register/hospital")
 def register_hospital(hospital: HospitalRegister, db: Session = Depends(get_db)):
     if db.query(Hospital).filter(Hospital.phone == hospital.phone).first():

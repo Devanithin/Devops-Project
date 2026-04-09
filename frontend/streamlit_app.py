@@ -10,7 +10,7 @@ from streamlit_folium import st_folium
 # Configuration
 BASE_URL = "http://127.0.0.1:8000"
 
-# Page configuration
+# Page configuratiions
 st.set_page_config(
     page_title="HemoLink - Blood Donor Management System",
     page_icon="🩸",
